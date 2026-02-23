@@ -232,18 +232,7 @@ html, body, .stApp {
     color: var(--accent);
 }
 
-/* ── Form ── */
-.stTextInput > div > div > input,
-.stSelectbox > div > div,
-.stDateInput > div > div > input,
-.stTextArea > div > div > textarea {
-    background: var(--bg2) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 4px !important;
-    color: var(--text) !important;
-    font-family: 'IBM Plex Sans', sans-serif !important;
-    font-size: 13px !important;
-}
+/* ── Form (base — extended further below) ── */
 .stButton > button {
     background: var(--accent2) !important;
     color: white !important;
@@ -331,6 +320,78 @@ html, body, .stApp {
     padding: 16px;
 }
 
+/* ── Form inputs ── */
+.stTextInput > div > div > input,
+.stSelectbox > div > div,
+.stDateInput > div > div > input,
+.stTextArea > div > div > textarea {
+    background: var(--bg2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 4px !important;
+    color: var(--text) !important;
+    font-family: 'IBM Plex Sans', sans-serif !important;
+    font-size: 13px !important;
+}
+
+/* ── Multiselect & Selectbox — control box ── */
+.stMultiSelect [data-baseweb="select"] > div,
+.stSelectbox  [data-baseweb="select"] > div {
+    background: var(--bg2) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+.stMultiSelect [data-baseweb="select"] span,
+.stMultiSelect [data-baseweb="select"] div,
+.stSelectbox  [data-baseweb="select"] span,
+.stSelectbox  [data-baseweb="select"] div {
+    color: var(--text) !important;
+    background: transparent !important;
+}
+
+/* ── Selected tags in multiselect ── */
+.stMultiSelect [data-baseweb="tag"] {
+    background: rgba(0,194,255,0.18) !important;
+    color: var(--accent) !important;
+    border: 1px solid rgba(0,194,255,0.35) !important;
+}
+.stMultiSelect [data-baseweb="tag"] span { color: var(--accent) !important; }
+
+/* ── Dropdown popup list (BaseWeb portal) ── */
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+ul[data-baseweb="menu"] {
+    background: #0c1020 !important;
+    border: 1px solid var(--border-hi) !important;
+    border-radius: 4px !important;
+}
+[data-baseweb="menu"] li,
+[data-baseweb="option"],
+[role="option"] {
+    background: #0c1020 !important;
+    color: #c8d8f0 !important;
+    font-family: 'IBM Plex Sans', sans-serif !important;
+    font-size: 13px !important;
+}
+[data-baseweb="menu"] li:hover,
+[data-baseweb="option"]:hover,
+[role="option"]:hover,
+[aria-selected="true"][role="option"] {
+    background: rgba(0,194,255,0.15) !important;
+    color: #00c2ff !important;
+}
+/* Force all text inside dropdown list to be visible */
+[data-baseweb="menu"] li *,
+[data-baseweb="option"] *,
+[role="option"] * {
+    color: #c8d8f0 !important;
+    background: transparent !important;
+}
+[data-baseweb="menu"] li:hover *,
+[data-baseweb="option"]:hover *,
+[role="option"]:hover * {
+    color: #00c2ff !important;
+}
+
 /* ── Streamlit overrides ── */
 label, .stLabel { color: var(--text) !important; font-size: 12px !important; font-family: 'IBM Plex Mono', monospace !important; letter-spacing: 0.08em !important; }
 div[data-testid="stWidgetLabel"] p { color: var(--text) !important; font-size: 12px !important; font-family: 'IBM Plex Mono', monospace !important; }
@@ -341,9 +402,6 @@ div[data-testid="stWidgetLabel"] p { color: var(--text) !important; font-size: 1
 div[data-testid="stDataFrame"] { background: var(--bg2) !important; }
 div[data-testid="stExpander"] summary { color: var(--text) !important; font-family: 'IBM Plex Mono', monospace !important; font-size: 12px !important; }
 div[data-testid="stExpander"] { border-color: var(--border) !important; background: var(--bg2) !important; }
-.stMultiSelect [data-baseweb="tag"] { background: rgba(0,194,255,0.15) !important; color: var(--accent) !important; }
-.stMultiSelect [data-baseweb="select"] span { color: var(--text) !important; }
-p, span, div { color: var(--text); }
 
 /* ── Bulk upload panel ── */
 .bulk-panel {
