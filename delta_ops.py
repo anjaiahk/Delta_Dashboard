@@ -332,10 +332,18 @@ html, body, .stApp {
 }
 
 /* ── Streamlit overrides ── */
-label, .stLabel { color: var(--muted) !important; font-size: 11px !important; font-family: 'IBM Plex Mono', monospace !important; text-transform: uppercase !important; letter-spacing: 0.1em !important; }
+label, .stLabel { color: var(--text) !important; font-size: 12px !important; font-family: 'IBM Plex Mono', monospace !important; letter-spacing: 0.08em !important; }
+div[data-testid="stWidgetLabel"] p { color: var(--text) !important; font-size: 12px !important; font-family: 'IBM Plex Mono', monospace !important; }
+.stSelectbox label, .stMultiSelect label, .stTextArea label, .stTextInput label, .stDateInput label, .stRadio label { color: var(--text) !important; font-size: 12px !important; }
+.stMarkdown p { color: var(--text) !important; }
 .stSuccess { background: rgba(0,221,136,0.08) !important; border: 1px solid rgba(0,221,136,0.3) !important; color: var(--lo) !important; }
 .stError   { background: rgba(255,68,102,0.08) !important; border: 1px solid rgba(255,68,102,0.3) !important; }
 div[data-testid="stDataFrame"] { background: var(--bg2) !important; }
+div[data-testid="stExpander"] summary { color: var(--text) !important; font-family: 'IBM Plex Mono', monospace !important; font-size: 12px !important; }
+div[data-testid="stExpander"] { border-color: var(--border) !important; background: var(--bg2) !important; }
+.stMultiSelect [data-baseweb="tag"] { background: rgba(0,194,255,0.15) !important; color: var(--accent) !important; }
+.stMultiSelect [data-baseweb="select"] span { color: var(--text) !important; }
+p, span, div { color: var(--text); }
 
 /* ── Bulk upload panel ── */
 .bulk-panel {
@@ -1050,11 +1058,21 @@ with tab1:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Charts row ───────────────────────────────────────────────────────────
+    # ── Helper pills (defined here for dashboard use) ─────────────────────────
+    def sev_pill(s):
+        cls = {"High": "high", "Medium": "medium", "Low": "low"}.get(s, "low")
+        return f'<span class="pill pill-{cls}">{s}</span>'
+
+    def status_pill(s):
+        cls = {"Open": "open", "In Progress": "inprogress", "Closed": "closed"}.get(s, "closed")
+        return f'<span class="pill pill-{cls}">{s}</span>'
+
+    # ── Row 1: Ops charts ─────────────────────────────────────────────────────
+    st.markdown('<p class="section-title">Operational Issues</p>', unsafe_allow_html=True)
     col_a, col_b, col_c = st.columns([1.2, 1, 1])
 
     with col_a:
-        st.markdown('<p class="section-title">Status Breakdown (Ops)</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-title">Status Breakdown</p>', unsafe_allow_html=True)
         if not df_ops.empty:
             status_counts = df_ops["status"].value_counts()
             colors_status = {"Open": "#ff4466", "In Progress": "#ffaa00", "Closed": "#00dd88"}
@@ -1076,7 +1094,9 @@ with tab1:
                                   font_size=22, font_family="IBM Plex Mono",
                                   font_color="#c8d8f0", showarrow=False)]
             )
-            st.plotly_chart(fig_donut, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_donut, use_container_width=True, config={"displayModeBar": False}, key="db_donut")
+        else:
+            st.markdown('<div class="alert-bar alert-info">No ops data yet.</div>', unsafe_allow_html=True)
 
     with col_b:
         st.markdown('<p class="section-title">Severity Distribution</p>', unsafe_allow_html=True)
@@ -1098,7 +1118,7 @@ with tab1:
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(tickfont=dict(family="IBM Plex Mono", size=11)),
             )
-            st.plotly_chart(fig_sev, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_sev, use_container_width=True, config={"displayModeBar": False}, key="db_sev")
 
     with col_c:
         st.markdown('<p class="section-title">Issues by Team</p>', unsafe_allow_html=True)
@@ -1121,61 +1141,227 @@ with tab1:
                 yaxis=dict(showgrid=True, gridcolor="#1e2d4a", showticklabels=False,
                            range=[0, team_counts.values.max() * 1.35]),
             )
-            st.plotly_chart(fig_team, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_team, use_container_width=True, config={"displayModeBar": False}, key="db_team")
 
-    # ── All issues table with Export ─────────────────────────────────────────
-    title_col, export_col = st.columns([3, 1])
-    with title_col:
-        st.markdown('<p class="section-title">All Issues — Summary</p>', unsafe_allow_html=True)
-    with export_col:
-        if not df_ops.empty:
-            export_df = df_ops.copy()
-            export_df["issue_date"] = pd.to_datetime(export_df["issue_date"], errors="coerce").dt.strftime("%d-%m-%Y")
-            st.download_button(
-                "📤 Export CSV",
-                data=export_df.to_csv(index=False).encode(),
-                file_name=f"DELTA_OPS_export_{date.today().strftime('%d%m%Y')}.csv",
-                mime="text/csv",
-                key="export_all_issues",
-                use_container_width=True,
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Row 2: Circular Implementation charts ────────────────────────────────
+    st.markdown('<p class="section-title">Circular Implementation</p>', unsafe_allow_html=True)
+    circ_col1, circ_col2, circ_col3 = st.columns([1.2, 1, 1])
+
+    with circ_col1:
+        st.markdown('<p class="section-title">Status Breakdown</p>', unsafe_allow_html=True)
+        if not df_circ.empty:
+            circ_status_counts2 = df_circ["status"].value_counts()
+            colors_cs = {"Open": "#ff4466", "In Progress": "#ffaa00", "Closed": "#00dd88"}
+            fig_circ_donut = go.Figure(go.Pie(
+                labels=circ_status_counts2.index,
+                values=circ_status_counts2.values,
+                hole=0.62,
+                marker_colors=[colors_cs.get(s, "#aa66ff") for s in circ_status_counts2.index],
+                textfont_size=11, textfont_family="IBM Plex Mono", showlegend=True,
+            ))
+            fig_circ_donut.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#c8d8f0", height=220, margin=dict(t=10,b=10,l=10,r=10),
+                legend=dict(font=dict(family="IBM Plex Mono", size=10), orientation="h",
+                            yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
+                annotations=[dict(text=f"<b>{len(df_circ)}</b>", x=0.5, y=0.5,
+                                  font_size=22, font_family="IBM Plex Mono",
+                                  font_color="#c8d8f0", showarrow=False)]
             )
+            st.plotly_chart(fig_circ_donut, use_container_width=True, config={"displayModeBar": False}, key="db_circ_donut")
+        else:
+            st.markdown('<div class="alert-bar alert-info">No circular data yet.</div>', unsafe_allow_html=True)
 
-    def sev_pill(s):
-        cls = {"High": "high", "Medium": "medium", "Low": "low"}.get(s, "low")
-        return f'<span class="pill pill-{cls}">{s}</span>'
+    with circ_col2:
+        st.markdown('<p class="section-title">Completion Progress</p>', unsafe_allow_html=True)
+        if not df_circ.empty:
+            circ_status_counts = df_circ["status"].value_counts()
+            total_c = circ_status_counts.sum()
+            pct_done = int(circ_status_counts.get("Closed", 0) / total_c * 100) if total_c > 0 else 0
+            fig_prog_db = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=pct_done,
+                number={"suffix": "%", "font": {"family": "IBM Plex Mono", "size": 32, "color": "#00dd88"}},
+                gauge=dict(
+                    axis=dict(range=[0, 100], tickcolor="#4a6080",
+                              tickfont=dict(family="IBM Plex Mono", size=10)),
+                    bar=dict(color="#00dd88", thickness=0.3),
+                    bgcolor="#0c1020",
+                    borderwidth=1, bordercolor="#1e2d4a",
+                    steps=[
+                        dict(range=[0, 40],  color="#1a0a0f"),
+                        dict(range=[40, 70], color="#1a150a"),
+                        dict(range=[70, 100], color="#0a1a12"),
+                    ],
+                    threshold=dict(line=dict(color="#aa66ff", width=3), thickness=0.8, value=75)
+                ),
+                title={"text": "Circulars Closed", "font": {"family": "IBM Plex Mono", "size": 11, "color": "#4a6080"}},
+            ))
+            fig_prog_db.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", font_color="#c8d8f0",
+                height=220, margin=dict(t=30, b=10, l=30, r=30)
+            )
+            st.plotly_chart(fig_prog_db, use_container_width=True, config={"displayModeBar": False}, key="db_prog")
 
-    def status_pill(s):
-        cls = {"Open": "open", "In Progress": "inprogress", "Closed": "closed"}.get(s, "closed")
-        return f'<span class="pill pill-{cls}">{s}</span>'
+    with circ_col3:
+        st.markdown('<p class="section-title">By Team</p>', unsafe_allow_html=True)
+        if not df_circ.empty:
+            circ_team = df_circ["team"].value_counts()
+            fig_ct_db = go.Figure(go.Bar(
+                x=circ_team.index, y=circ_team.values,
+                marker_color="#aa66ff", marker_opacity=0.75,
+                text=circ_team.values, textposition="outside",
+                textfont=dict(family="IBM Plex Mono", size=11, color="#c8d8f0"),
+            ))
+            fig_ct_db.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#c8d8f0", height=220,
+                margin=dict(t=30, b=10, l=10, r=10),
+                xaxis=dict(tickfont=dict(family="IBM Plex Mono", size=10)),
+                yaxis=dict(showgrid=True, gridcolor="#1e2d4a", showticklabels=False,
+                           range=[0, circ_team.values.max() * 1.35]),
+            )
+            st.plotly_chart(fig_ct_db, use_container_width=True, config={"displayModeBar": False}, key="db_ct")
 
-    if df_ops.empty:
-        st.markdown('<div class="alert-bar alert-info">No operational issues logged yet.</div>', unsafe_allow_html=True)
-    else:
-        rows_html = ""
-        for _, row in df_ops.sort_values(["status", "severity"], ascending=[True, True]).iterrows():
-            date_str = row["issue_date"].strftime("%d %b %Y") if pd.notna(row["issue_date"]) else "—"
-            desc = str(row["issue_description"])[:72] + ("…" if len(str(row["issue_description"])) > 72 else "")
-            rows_html += f"""
-            <tr>
-                <td class="team-cell">{row['team']}</td>
-                <td>{desc}</td>
-                <td>{date_str}</td>
-                <td>{row['reported_to']}</td>
-                <td>{sev_pill(row['severity'])}</td>
-                <td>{status_pill(row['status'])}</td>
-            </tr>"""
+    st.markdown("<br>", unsafe_allow_html=True)
 
-        st.markdown(f"""
-        <div class="chart-wrapper">
-        <table class="issue-table">
-            <thead><tr>
-                <th>Team</th><th>Description</th><th>Date</th>
-                <th>Reported To</th><th>Severity</th><th>Status</th>
-            </tr></thead>
-            <tbody>{rows_html}</tbody>
-        </table>
-        </div>
-        """, unsafe_allow_html=True)
+    # ── Row 3: Task Reminder charts ───────────────────────────────────────────
+    st.markdown('<p class="section-title">Task Reminders</p>', unsafe_allow_html=True)
+    task_col1, task_col2, task_col3 = st.columns([1.2, 1, 1])
+
+    with task_col1:
+        st.markdown('<p class="section-title">By Status</p>', unsafe_allow_html=True)
+        if not df_task.empty:
+            task_stat_counts = df_task["status"].value_counts()
+            colors_ts = {"Open": "#ff4466", "In Progress": "#ffaa00", "Closed": "#00dd88"}
+            fig_ts_db = go.Figure(go.Pie(
+                labels=task_stat_counts.index,
+                values=task_stat_counts.values,
+                hole=0.55,
+                marker_colors=[colors_ts.get(s, "#ff9933") for s in task_stat_counts.index],
+                textfont_size=10, textfont_family="IBM Plex Mono", showlegend=True,
+            ))
+            fig_ts_db.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#c8d8f0", height=220, margin=dict(t=10,b=10,l=10,r=10),
+                legend=dict(font=dict(family="IBM Plex Mono", size=9), orientation="h",
+                            yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                annotations=[dict(text=f"<b>{len(df_task)}</b>", x=0.5, y=0.5,
+                                  font_size=20, font_family="IBM Plex Mono",
+                                  font_color="#c8d8f0", showarrow=False)]
+            )
+            st.plotly_chart(fig_ts_db, use_container_width=True, config={"displayModeBar": False}, key="db_ts")
+        else:
+            st.markdown('<div class="alert-bar alert-info">No task data yet.</div>', unsafe_allow_html=True)
+
+    with task_col2:
+        st.markdown('<p class="section-title">Task Status Overview</p>', unsafe_allow_html=True)
+        if not df_task.empty:
+            today_norm = pd.Timestamp(date.today()).normalize()
+            due_norm   = pd.to_datetime(df_task["due_date"], errors="coerce").dt.normalize()
+            is_closed    = df_task["status"].str.strip().str.lower() == "closed"
+            is_overdue   = (due_norm < today_norm) & (~is_closed)
+            is_due_today = (due_norm == today_norm) & (~is_closed)
+
+            n_closed    = int(is_closed.sum())
+            n_due_today = int(is_due_today.sum())
+            n_overdue   = int(is_overdue.sum())
+            total_tasks = len(df_task)
+            def pct(n): return round(n / total_tasks * 100) if total_tasks > 0 else 0
+
+            categories = ["Closed",    "Due Today",  "Overdue"]
+            values     = [n_closed,    n_due_today,  n_overdue]
+            colors     = ["#00dd88",   "#ffaa00",    "#ff4466"]
+            borders    = ["#00ff99",   "#ffcc44",    "#ff6680"]
+            txt_dark   = ["#001a0d",   "#1a0f00",    "#1a000a"]
+
+            fig_ot = go.Figure()
+            for cat, val, col, bord, tdark in zip(categories, values, colors, borders, txt_dark):
+                p     = pct(val)
+                label = f"  {val}  ({p}%)"
+                fig_ot.add_trace(go.Bar(
+                    name=cat,
+                    x=[max(val, 0.12)],   # tiny stub so zero rows still render
+                    y=[cat],
+                    orientation="h",
+                    marker=dict(color=col, opacity=0.90, line=dict(color=bord, width=1.5)),
+                    text=[label],
+                    textposition="inside" if val > 0 else "outside",
+                    textfont=dict(
+                        family="IBM Plex Mono", size=13,
+                        color=tdark if val > 0 else col
+                    ),
+                    insidetextanchor="middle",
+                    width=0.52,
+                    showlegend=False,
+                ))
+
+            max_val = max(values + [1])
+            fig_ot.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#c8d8f0",
+                height=220,
+                margin=dict(t=10, b=28, l=82, r=40),
+                showlegend=False,
+                xaxis=dict(
+                    showgrid=True, gridcolor="#1e2d4a",
+                    showticklabels=False, zeroline=True,
+                    zerolinecolor="#2a4070", zerolinewidth=1,
+                    range=[0, max_val * 1.6],
+                ),
+                yaxis=dict(
+                    tickfont=dict(family="IBM Plex Mono", size=12, color="#c8d8f0"),
+                    tickcolor="#4a6080",
+                    categoryorder="array",
+                    categoryarray=["Overdue", "Due Today", "Closed"],
+                ),
+                bargap=0.30,
+            )
+            fig_ot.add_annotation(
+                text=f"Total · {total_tasks} tasks",
+                xref="paper", yref="paper",
+                x=1.0, y=-0.16,
+                showarrow=False,
+                font=dict(family="IBM Plex Mono", size=9, color="#4a6080"),
+                xanchor="right",
+            )
+            st.plotly_chart(fig_ot, use_container_width=True, config={"displayModeBar": False}, key="db_ot")
+
+    with task_col3:
+        st.markdown('<p class="section-title">Tasks by Team &amp; Status</p>', unsafe_allow_html=True)
+        if not df_task.empty:
+            teams_order_db = [t for t in TASK_TEAMS if t in df_task["team"].values]
+            status_colors_db = [("Open", "#ff4466"), ("In Progress", "#ffaa00"), ("Closed", "#00dd88")]
+            fig_tts_db = go.Figure()
+            for status_val, color in status_colors_db:
+                counts = [len(df_task[(df_task["team"] == t) & (df_task["status"] == status_val)]) for t in teams_order_db]
+                fig_tts_db.add_trace(go.Bar(
+                    name=status_val,
+                    y=teams_order_db,
+                    x=counts,
+                    orientation="h",
+                    marker=dict(color=color, opacity=0.88),
+                    text=[str(c) if c > 0 else "" for c in counts],
+                    textposition="inside",
+                    textfont=dict(family="IBM Plex Mono", size=11, color="#ffffff"),
+                    insidetextanchor="middle",
+                ))
+            fig_tts_db.update_layout(
+                barmode="stack",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#c8d8f0", height=220,
+                margin=dict(t=10, b=10, l=10, r=30),
+                xaxis=dict(showgrid=True, gridcolor="#1e2d4a", showticklabels=False, zeroline=False),
+                yaxis=dict(tickfont=dict(family="IBM Plex Mono", size=11, color="#c8d8f0"), autorange="reversed"),
+                legend=dict(font=dict(family="IBM Plex Mono", size=9, color="#c8d8f0"), orientation="h",
+                            yanchor="bottom", y=-0.28, xanchor="center", x=0.5,
+                            bgcolor="rgba(0,0,0,0)"),
+                bargap=0.3,
+            )
+            st.plotly_chart(fig_tts_db, use_container_width=True, config={"displayModeBar": False}, key="db_tts")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1225,30 +1411,63 @@ with tab2:
         if filt.empty:
             st.markdown('<div class="alert-bar alert-info">No issues match current filters.</div>', unsafe_allow_html=True)
         else:
-            rows_html2 = ""
-            for _, row in filt.sort_values(["status", "severity"]).iterrows():
-                date_str = row["issue_date"].strftime("%d %b %Y") if pd.notna(row["issue_date"]) else "—"
-                rows_html2 += f"""
-                <tr>
-                    <td class="team-cell">{row['team']}</td>
-                    <td>{row['issue_description']}</td>
-                    <td>{date_str}</td>
-                    <td>{row['reported_to']}</td>
-                    <td>{sev_pill(row['severity'])}</td>
-                    <td>{status_pill(row['status'])}</td>
-                </tr>"""
+            def sev_pill(s):
+                cls = {"High": "high", "Medium": "medium", "Low": "low"}.get(s, "low")
+                return f'<span class="pill pill-{cls}">{s}</span>'
+            def status_pill(s):
+                cls = {"Open": "open", "In Progress": "inprogress", "Closed": "closed"}.get(s, "closed")
+                return f'<span class="pill pill-{cls}">{s}</span>'
 
-            st.markdown(f"""
-            <div class="chart-wrapper">
-            <table class="issue-table">
-                <thead><tr>
-                    <th>Team</th><th>Description</th><th>Date</th>
-                    <th>Reported To</th><th>Severity</th><th>Status</th>
-                </tr></thead>
-                <tbody>{rows_html2}</tbody>
-            </table>
-            </div>
-            """, unsafe_allow_html=True)
+            for status_label, default_open in [("Open", True), ("In Progress", True), ("Closed", False)]:
+                group = filt[filt["status"] == status_label].sort_values("severity")
+                if group.empty:
+                    continue
+                label = f"{status_label}  ({len(group)})"
+                with st.expander(label, expanded=default_open):
+                    rows_html2 = ""
+                    for idx_row, row in group.iterrows():
+                        date_str = row["issue_date"].strftime("%d %b %Y") if pd.notna(row["issue_date"]) else "—"
+                        rows_html2 += f"""
+                        <tr>
+                            <td class="team-cell">{_html.escape(str(row['team']))}</td>
+                            <td>{_html.escape(str(row['issue_description']))}</td>
+                            <td>{date_str}</td>
+                            <td>{_html.escape(str(row['reported_to']))}</td>
+                            <td>{sev_pill(row['severity'])}</td>
+                            <td>{status_pill(row['status'])}</td>
+                        </tr>"""
+                    st.markdown(f"""
+                    <div class="chart-wrapper">
+                    <table class="issue-table">
+                        <thead><tr>
+                            <th>Team</th><th>Description</th><th>Date</th>
+                            <th>Reported To</th><th>Severity</th><th>Status</th>
+                        </tr></thead>
+                        <tbody>{rows_html2}</tbody>
+                    </table>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        # ── Delete section ────────────────────────────────────────────────────
+        if not df_ops.empty:
+            st.markdown('<p class="section-title" style="margin-top:24px">Delete Issues</p>', unsafe_allow_html=True)
+            ops_delete_options = {
+                f"[{i}] {row['team']} | {str(row['issue_description'])[:50]} | {row['status']}": i
+                for i, row in df_ops.iterrows()
+            }
+            ops_to_delete = st.multiselect(
+                "Select issue(s) to delete (multi-select supported)",
+                options=list(ops_delete_options.keys()),
+                key="ops_delete_select"
+            )
+            if ops_to_delete:
+                if st.button("🗑 DELETE SELECTED ISSUES", key="ops_delete_btn", use_container_width=True):
+                    indices_to_drop = [ops_delete_options[k] for k in ops_to_delete]
+                    st.session_state["ops_data"] = df_ops.drop(index=indices_to_drop).reset_index(drop=True)
+                    save_ops(st.session_state["ops_data"])
+                    st.session_state["flash"] = ("success", f"{len(indices_to_drop)} issue(s) deleted.")
+                    st.session_state["active_tab"] = "ops"
+                    st.rerun()
 
     with col_right:
         st.markdown('<p class="section-title">Log New Issue</p>', unsafe_allow_html=True)
@@ -1482,60 +1701,26 @@ with tab3:
                 with st.expander(label, expanded=default_open):
                     render_circ_cards(group)
 
-        # ── Circular progress chart ───────────────────────────────────────────
+        # ── Delete section ─────────────────────────────────────────────────────
         if not df_circ.empty:
-            st.markdown('<p class="section-title" style="margin-top:24px">Implementation Progress</p>', unsafe_allow_html=True)
-            circ_status = df_circ["status"].value_counts()
-            total_c = circ_status.sum()
-            pct_done = int(circ_status.get("Closed", 0) / total_c * 100) if total_c > 0 else 0
-
-            prog_col, team_col = st.columns([1, 1])
-            with prog_col:
-                fig_prog = go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=pct_done,
-                    number={"suffix": "%", "font": {"family": "IBM Plex Mono", "size": 36, "color": "#00dd88"}},
-                    gauge=dict(
-                        axis=dict(range=[0, 100], tickcolor="#4a6080",
-                                  tickfont=dict(family="IBM Plex Mono", size=10)),
-                        bar=dict(color="#00dd88", thickness=0.3),
-                        bgcolor="#0c1020",
-                        borderwidth=1, bordercolor="#1e2d4a",
-                        steps=[
-                            dict(range=[0, 40],  color="#1a0a0f"),
-                            dict(range=[40, 70], color="#1a150a"),
-                            dict(range=[70, 100], color="#0a1a12"),
-                        ],
-                        threshold=dict(line=dict(color="#aa66ff", width=3), thickness=0.8, value=75)
-                    ),
-                    title={"text": "Circulars Closed", "font": {"family": "IBM Plex Mono", "size": 11, "color": "#4a6080"}},
-                ))
-                fig_prog.update_layout(
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font_color="#c8d8f0",
-                    height=200,
-                    margin=dict(t=30, b=10, l=30, r=30)
-                )
-                st.plotly_chart(fig_prog, use_container_width=True, config={"displayModeBar": False})
-
-            with team_col:
-                st.markdown('<p class="section-title">By Team</p>', unsafe_allow_html=True)
-                circ_team = df_circ["team"].value_counts()
-                fig_ct = go.Figure(go.Bar(
-                    x=circ_team.index, y=circ_team.values,
-                    marker_color="#aa66ff", marker_opacity=0.75,
-                    text=circ_team.values, textposition="outside",
-                    textfont=dict(family="IBM Plex Mono", size=11, color="#c8d8f0"),
-                ))
-                fig_ct.update_layout(
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    font_color="#c8d8f0", height=200,
-                    margin=dict(t=30, b=10, l=10, r=10),
-                    xaxis=dict(tickfont=dict(family="IBM Plex Mono", size=10)),
-                    yaxis=dict(showgrid=True, gridcolor="#1e2d4a", showticklabels=False,
-                               range=[0, circ_team.values.max() * 1.35]),
-                )
-                st.plotly_chart(fig_ct, use_container_width=True, config={"displayModeBar": False})
+            st.markdown('<p class="section-title" style="margin-top:24px">Delete Circular Items</p>', unsafe_allow_html=True)
+            circ_delete_options = {
+                f"[{i}] {row['team']} | {str(row['circular_description'])[:50]} | {row['status']}": i
+                for i, row in df_circ.iterrows()
+            }
+            circ_to_delete = st.multiselect(
+                "Select circular item(s) to delete (multi-select supported)",
+                options=list(circ_delete_options.keys()),
+                key="circ_delete_select"
+            )
+            if circ_to_delete:
+                if st.button("🗑 DELETE SELECTED CIRCULARS", key="circ_delete_btn", use_container_width=True):
+                    indices_to_drop = [circ_delete_options[k] for k in circ_to_delete]
+                    st.session_state["circ_data"] = df_circ.drop(index=indices_to_drop).reset_index(drop=True)
+                    save_circ(st.session_state["circ_data"])
+                    st.session_state["flash"] = ("success", f"{len(indices_to_drop)} circular item(s) deleted.")
+                    st.session_state["active_tab"] = "circ"
+                    st.rerun()
 
     with col_cr:
         # ── Log circular ──────────────────────────────────────────────────────
@@ -1809,68 +1994,28 @@ with tab4:
                 with st.expander(label, expanded=default_open):
                     render_task_cards(group)
 
+        # ── Delete section ─────────────────────────────────────────────────────
         if not df_task.empty:
-            st.markdown('<p class="section-title" style="margin-top:28px">Summary</p>', unsafe_allow_html=True)
-            ch1, ch2 = st.columns([1, 2])
+            st.markdown('<p class="section-title" style="margin-top:24px">Delete Tasks</p>', unsafe_allow_html=True)
+            task_delete_options = {
+                f"[{i}] {row['team']} | {str(row['issue_description'])[:50]} | {row['status']}": i
+                for i, row in df_task.iterrows()
+            }
+            tasks_to_delete = st.multiselect(
+                "Select task(s) to delete (multi-select supported)",
+                options=list(task_delete_options.keys()),
+                key="task_delete_select"
+            )
+            if tasks_to_delete:
+                if st.button("🗑 DELETE SELECTED TASKS", key="task_delete_btn", use_container_width=True):
+                    indices_to_drop = [task_delete_options[k] for k in tasks_to_delete]
+                    st.session_state["task_data"] = df_task.drop(index=indices_to_drop).reset_index(drop=True)
+                    save_task(st.session_state["task_data"])
+                    st.session_state["flash"] = ("success", f"{len(indices_to_drop)} task(s) deleted.")
+                    st.session_state["active_tab"] = "task"
+                    st.rerun()
 
-            with ch1:
-                st.markdown('<p class="section-title">By Status</p>', unsafe_allow_html=True)
-                task_stat_counts = df_task["status"].value_counts()
-                colors_status = {"Open": "#ff4466", "In Progress": "#ffaa00", "Closed": "#00dd88"}
-                fig_ts = go.Figure(go.Pie(
-                    labels=task_stat_counts.index,
-                    values=task_stat_counts.values,
-                    hole=0.55,
-                    marker_colors=[colors_status.get(s, "#4a6080") for s in task_stat_counts.index],
-                    textfont_size=10, textfont_family="IBM Plex Mono", showlegend=True,
-                ))
-                fig_ts.update_layout(
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    font_color="#c8d8f0", height=220, margin=dict(t=10,b=10,l=10,r=10),
-                    legend=dict(font=dict(family="IBM Plex Mono", size=9), orientation="h",
-                                yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
-                    annotations=[dict(text=f"<b>{len(df_task)}</b>", x=0.5, y=0.5,
-                                      font_size=20, font_family="IBM Plex Mono",
-                                      font_color="#c8d8f0", showarrow=False)]
-                )
-                st.plotly_chart(fig_ts, use_container_width=True, config={"displayModeBar": False})
 
-            with ch2:
-                st.markdown('<p class="section-title">Tasks by Team &amp; Status</p>', unsafe_allow_html=True)
-                # Elegant horizontal grouped bar — one row per team, coloured by status
-                teams_order = [t for t in TASK_TEAMS if t in df_task["team"].values]
-                status_colors = {"Open": "#ff4466", "In Progress": "#ffaa00", "Closed": "#00dd88"}
-                fig_team_status = go.Figure()
-                for status_val, color in status_colors.items():
-                    counts = []
-                    for team in teams_order:
-                        n = len(df_task[(df_task["team"] == team) & (df_task["status"] == status_val)])
-                        counts.append(n)
-                    fig_team_status.add_trace(go.Bar(
-                        name=status_val,
-                        y=teams_order,
-                        x=counts,
-                        orientation="h",
-                        marker_color=color,
-                        marker_opacity=0.85,
-                        text=[str(c) if c > 0 else "" for c in counts],
-                        textposition="inside",
-                        textfont=dict(family="IBM Plex Mono", size=11, color="rgba(0,0,0,0.7)"),
-                        insidetextanchor="middle",
-                    ))
-                fig_team_status.update_layout(
-                    barmode="stack",
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    font_color="#c8d8f0", height=220,
-                    margin=dict(t=10, b=10, l=10, r=30),
-                    xaxis=dict(showgrid=True, gridcolor="#1e2d4a", showticklabels=False, zeroline=False),
-                    yaxis=dict(tickfont=dict(family="IBM Plex Mono", size=11), autorange="reversed"),
-                    legend=dict(font=dict(family="IBM Plex Mono", size=9), orientation="h",
-                                yanchor="bottom", y=-0.22, xanchor="center", x=0.5,
-                                bgcolor="rgba(0,0,0,0)"),
-                    bargap=0.3,
-                )
-                st.plotly_chart(fig_team_status, use_container_width=True, config={"displayModeBar": False})
 
     with col_tr:
         st.markdown('<p class="section-title">Add Task Reminder</p>', unsafe_allow_html=True)
